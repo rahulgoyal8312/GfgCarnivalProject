@@ -235,3 +235,80 @@ function createUserEntry($userDetails){
     }
     return $userId;
 }
+
+
+function lastDayEventAnalytics(){
+    global $dynamoDb;
+    global $marshaler;
+    if(!isset($marshaler) && !isset($dynamoDb)){
+        $dynamoDb = new DynamoDb();
+        $marshaler = new MarshalerDynamo();
+    }
+    
+    $eav = [":dateKey"=> EVENT_CREATED_TIME_PK, ":startDate"=>  date("Y-m-d H:i:s", strtotime("-1 days"))];
+    $params = [
+        "TableName" => TRACKING_TABLE,
+        "IndexName" => "key5-value-index",
+        "KeyConditionExpression" => "key5 = :dateKey and #value >= :startDate",
+        "ExpressionAttributeValues" => $marshaler->marshalItem($eav),
+        "ExpressionAttributeNames" => ["#value"=> "value"]
+    ];
+    try{
+        $result = $dynamoDb->query($params);
+        $eventArray = [];
+        $totalVisits = [];
+        $uniqueVisits = [];
+        foreach($result['Items'] as $item){
+            $item = $marshaler->unmarshalItem($item);
+            
+            if(@$eventArray[$item['key2']]){
+                $totalVisits[$item['key2']]++;
+                if(!@$uniqueVisits[$item['key2']][$item['key1']]){
+                    $uniqueVisits[$item['key2']][$item['key1']] = 1;
+                }
+                if(@$item['value3'])
+                    $eventArray[$item['key2']]["percentage_scrolled"][] = $item['value3'];
+                if(@$item['value4'])
+                    $eventArray[$item['key2']]["time_spent"][] = $item['value4'];
+            }
+            else{
+                $totalVisits[$item['key2']] = 1;
+                $uniqueVisits[$item['key2']][$item['key1']] = 1;
+                if(@$item['value3']){
+                    $eventArray[$item['key2']]["percentage_scrolled"] = [$item['value3']];
+                }
+                else{
+                    $eventArray[$item['key2']]["percentage_scrolled"] = [];
+                }
+                if(@$item['value4']){
+                    $eventArray[$item['key2']]["time_spent"] = [$item['value4']];
+                }
+                else{
+                    $eventArray[$item['key2']]["time_spent"] = [];
+                }
+                $eventArray[$item['key2']]["url"] = $item['url'];
+            }
+        }
+        $eventAverageArray = [];
+        foreach($eventArray as $postId => $eventDetails){
+            $eventAverageArray[$postId]["percentage_scrolled"] = 0;
+            $eventAverageArray[$postId]["time_spent"] = 0;
+            foreach($eventDetails["percentage_scrolled"] as $percentScrolled){
+                $eventAverageArray[$postId]["percentage_scrolled"] += $percentScrolled;
+            }
+            foreach($eventDetails["time_spent"] as $timeSpent){
+                $eventAverageArray[$postId]["time_spent"] += $timeSpent;
+            }
+            $eventAverageArray[$postId]["percentage_scrolled"] = count($eventDetails["percentage_scrolled"]) > 0 ? $eventAverageArray[$postId]["percentage_scrolled"]/count($eventDetails["percentage_scrolled"]) : 0;       
+            $eventAverageArray[$postId]["time_spent"] = count($eventDetails["time_spent"]) > 0 ? $eventAverageArray[$postId]["time_spent"]/count($eventDetails["time_spent"]) : 0;
+            $eventAverageArray[$postId]["url"] = $eventDetails["url"];
+            $eventAverageArray[$postId]["total_visits"] = $totalVisits[$postId];
+            $eventAverageArray[$postId]["unique_visits"] = count($uniqueVisits[$postId]);
+        }
+        return $eventAverageArray;
+    }
+    catch(Exception $e){
+        error_log($e->getMessage());
+        error_log("Unable to fetch last day event analytics | Function Name : lastDayEventAnalytics (dynamoDbFunctions)");
+    }
+}
