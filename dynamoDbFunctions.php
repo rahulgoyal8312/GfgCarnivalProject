@@ -353,3 +353,35 @@ function fetchAllBrowserNames(){
         error_log("Unable to fetch names of all Browsers | Function Name : fetchAllBrowserNames");
     }
 }
+
+function fetchScreenResolutionEventAnalytics(){
+    global $dynamoDb;
+    global $marshaler;
+    if(!isset($marshaler) && !isset($dynamoDb)){
+        $dynamoDb = new DynamoDb();
+        $marshaler = new MarshalerDynamo();
+    }
+
+    $params = [
+        "TableName"=> TRACKING_TABLE,
+        "IndexName"=> "key6-value6-index",
+        "KeyConditionExpression"=> "key6 = :srKey",
+        "ExpressionAttributeValues"=> $marshaler->marshalItem([":srKey"=> SCREEN_RESOLUTION_EVENT_PK])
+    ];
+    try{
+        $result = $dynamoDb->query($params);
+        $resolutionCount = [];
+        foreach($result["Items"] as $item){
+            $item = $marshaler->unmarshalItem($item);
+            $resolutionCount[$item['value6']] = @$resolutionCount[$item['value6']] ? $resolutionCount[$item['value6']]+1 : 1;
+        }
+        foreach($resolutionCount as $resolution => $count){
+            $resolutionCount[$resolution] = $count/count($result["Items"]) * 100;
+        }
+        return $resolutionCount;
+    }
+    catch(Exception $e){
+        error_log($e->getMessage());
+        error_log("Unable to fetch screen resolution event analytics | Function Name : fetchScreenResolutionEventAnalytics (dynamoDbFunctions)");
+    }
+}
