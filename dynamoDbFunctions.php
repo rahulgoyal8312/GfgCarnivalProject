@@ -312,3 +312,44 @@ function lastDayEventAnalytics(){
         error_log("Unable to fetch last day event analytics | Function Name : lastDayEventAnalytics (dynamoDbFunctions)");
     }
 }
+
+function fetchAllBrowserNames(){
+    global $dynamoDb;
+    global $marshaler;
+    if(!isset($marshaler) && !isset($dynamoDb)){
+        $dynamoDb = new DynamoDb();
+        $marshaler = new MarshalerDynamo();
+    }
+
+    $eav = [":browserNameKey"=> EVENT_BROWSER_NAME_PK, ":lastDayTime"=> date("Y-m-d H:i:s", strtotime("-1 days"))];
+    $params = [
+        "TableName"=> TRACKING_TABLE,
+        "IndexName"=> "key7-value7-index",
+        "KeyConditionExpression"=> "key7 = :browserNameKey",
+        "ProjectionExpression"=> "value7, id",
+        "FilterExpression"=> "#value >= :lastDayTime",
+        "ExpressionAttributeValues"=> $marshaler->marshalItem($eav),
+        "ExpressionAttributeNames" => ["#value"=> "value"]
+    ];
+    try{
+        $result = $dynamoDb->query($params);
+        $browserMap = [];
+        foreach($result["Items"] as $user){
+            $user = $marshaler->unmarshalItem($user);
+            if(@$browserMap[$user["value7"]]){
+                $browserMap[$user["value7"]]++;
+            }
+            else{
+                $browserMap[$user["value7"]] = 1;
+            }
+        }
+        foreach($browserMap as $browserName => $count){
+            $browserMap[$browserName] = $count/count($result['Items']) * 100;
+        }
+        return $browserMap;
+    }
+    catch(Exception $e){
+        error_log($e->getMessage());
+        error_log("Unable to fetch names of all Browsers | Function Name : fetchAllBrowserNames");
+    }
+}

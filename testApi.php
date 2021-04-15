@@ -10,8 +10,8 @@ include_once "dynamoDbFunctions.php";
 // $scrollEventAnalytics = fetchScrollTimespentEventAnalytics(2503, true);
 // error_log(print_r($scrollEventAnalytics, true));
 
-error_log(print_r(lastDayEventAnalytics(), true));
+//error_log(print_r(lastDayEventAnalytics(), true));
 //error_log(print_r(fetchAllUserDetails(), true));
 
-//error_log(print_r(fetchAllBrowserNames(), true));
+error_log(print_r(fetchAllBrowserNames(), true));
 ?>
